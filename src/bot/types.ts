@@ -6,4 +6,5 @@ export type MyContext = BaseContext & I18nFlavor & SessionFlavor<Session>;
 export type Session = {
 	page?: number;
 	dbuser?: IUser;
+	loading: boolean;
 };

@@ -7,3 +7,5 @@ dist/
 
 # Ignore environment variables file
 .env
+
+sessions

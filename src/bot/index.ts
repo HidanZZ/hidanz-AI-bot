@@ -7,8 +7,10 @@ import dotenv from "dotenv";
 import attachUser from "./middlewares/attachUser";
 import { ignoreOld, sequentialize } from "grammy-middlewares";
 import { bot as menu } from "./menu";
+import { bot as commands } from "./commands";
 import configureI18n from "./middlewares/configure-i18n";
-
+import { getAIResponse } from "../utils/ai";
+import { FileAdapter } from "@grammyjs/storage-file";
 dotenv.config();
 const token = env["BOT_TOKEN"];
 if (!token) {
@@ -26,18 +28,22 @@ export const i18n = new I18n({
 	useSession: true,
 	directory: "locales",
 });
-const initialSession: Session = {};
+const initialSession: Session = {
+	loading: false,
+};
 baseBot.use(i18n);
 
-baseBot.use(ignoreOld());
-baseBot.use(sequentialize());
+// baseBot.use(ignoreOld());
+// baseBot.use(sequentialize());
 baseBot.use(
 	session<Session, MyContext>({
 		initial: (): Session => initialSession,
+		// storage: new FileAdapter(),
 	})
 );
 baseBot.use(attachUser);
 baseBot.use(configureI18n);
+baseBot.use(commands);
 
 async function startMessage(ctx: MyContext) {
 	const name = ctx.from?.first_name ?? "User";
@@ -58,8 +64,19 @@ async function startMessage(ctx: MyContext) {
 		},
 	});
 }
-
 baseBot.command(["start", "help"], startMessage);
+baseBot.on("message", async (ctx) => {
+	console.log("loading", ctx.session.loading);
+
+	if (ctx.session.loading) return;
+	const user = ctx.session.dbuser;
+	if (!user) return;
+	const message = ctx.message?.text;
+	if (!message) return;
+	if (message.startsWith("/")) return;
+	const reply_msg = await ctx.reply("...");
+	getAIResponse(user, message, ctx, ctx.chat.id, reply_msg.message_id);
+});
 
 baseBot.use(menu);
 export async function start(): Promise<void> {
@@ -68,6 +85,8 @@ export async function start(): Promise<void> {
 		{ command: "start", description: "Start the bot" },
 		{ command: "help", description: "Show help" },
 		{ command: "settings", description: "Show settings" },
+		{ command: "reset", description: "Reset chat history" },
+		{ command: "image", description: "Generate an image" },
 	]);
 
 	await baseBot.start({
