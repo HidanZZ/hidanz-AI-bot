@@ -5,12 +5,10 @@ import { I18n } from "@grammyjs/i18n";
 import { generateUpdateMiddleware } from "telegraf-middleware-console-time";
 import dotenv from "dotenv";
 import attachUser from "./middlewares/attachUser";
-import { ignoreOld, sequentialize } from "grammy-middlewares";
 import { bot as menu } from "./menu";
 import { bot as commands } from "./commands";
 import configureI18n from "./middlewares/configure-i18n";
-import { getAIResponse } from "../utils/ai";
-import { FileAdapter } from "@grammyjs/storage-file";
+import { hydrateFiles } from "@grammyjs/files";
 dotenv.config();
 const token = env["BOT_TOKEN"];
 if (!token) {
@@ -41,10 +39,11 @@ baseBot.use(
 		// storage: new FileAdapter(),
 	})
 );
+baseBot.api.config.use(hydrateFiles(baseBot.token));
+
 baseBot.use(attachUser);
 baseBot.use(configureI18n);
 baseBot.use(commands);
-
 async function startMessage(ctx: MyContext) {
 	const name = ctx.from?.first_name ?? "User";
 	let text = `Hey ${name}!`;
@@ -65,18 +64,6 @@ async function startMessage(ctx: MyContext) {
 	});
 }
 baseBot.command(["start", "help"], startMessage);
-baseBot.on("message", async (ctx) => {
-	console.log("loading", ctx.session.loading);
-
-	if (ctx.session.loading) return;
-	const user = ctx.session.dbuser;
-	if (!user) return;
-	const message = ctx.message?.text;
-	if (!message) return;
-	if (message.startsWith("/")) return;
-	const reply_msg = await ctx.reply("...");
-	getAIResponse(user, message, ctx, ctx.chat.id, reply_msg.message_id);
-});
 
 baseBot.use(menu);
 export async function start(): Promise<void> {

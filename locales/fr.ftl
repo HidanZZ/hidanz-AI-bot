@@ -16,3 +16,8 @@ reset_success=
 reset_error=
     Une erreur s'est produite lors de la réinitialisation de votre historique de chat. Veuillez réessayer ultérieurement.
 
+media_group_error=
+    Impossible d'envoyer plus d'un document à la fois.
+
+caption_error=
+    Doit spécifier ce qu'il faut faire avec le document.

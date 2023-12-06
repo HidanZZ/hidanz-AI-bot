@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import { MyContext } from "../bot/types";
 dotenv.config();
 import { InputFile } from "grammy";
-import { base64ToUint8Array } from "./file";
+import { base64ToUint8Array, downloadAsFileLike } from "./file";
 const openai = new OpenAI();
 
 const TIMEOUT = 1000 * 60; // 1 minute
@@ -22,7 +22,8 @@ const createThreadIfNotExists = async (userId: number, thread_id?: string) => {
 };
 const processAssistantMessage = async (
 	thread_id: string,
-	userMessage: string
+	userMessage: string,
+	file_id?: string
 ) => {
 	try {
 		const assistantId = env["ASSISTANT_ID"];
@@ -31,6 +32,7 @@ const processAssistantMessage = async (
 		await openai.beta.threads.messages.create(thread_id, {
 			role: "user",
 			content: userMessage,
+			file_ids: file_id ? [file_id] : undefined,
 		});
 
 		// Create a run with the assistant
@@ -153,12 +155,25 @@ const generateImage = async (prompt: string) => {
 
 	return response.data[0].b64_json;
 };
+
+const handleFileUpload = async (file_url: string) => {
+	const filelike = await downloadAsFileLike(file_url);
+
+	const file = await openai.files.create({
+		file: filelike,
+		purpose: "assistants",
+	});
+	console.log("file", file);
+
+	return file.id;
+};
 export async function getAIResponse(
 	user: IUser,
 	message: string,
 	ctx: MyContext,
 	chat_id: number,
-	reply_to_message_id: number
+	reply_to_message_id: number,
+	file_url?: string
 ) {
 	try {
 		const thread_id = await createThreadIfNotExists(
@@ -166,7 +181,8 @@ export async function getAIResponse(
 			user.current_thread
 		);
 		ctx.session.loading = true;
-		await processAssistantMessage(thread_id, message);
+		const file_id = file_url ? await handleFileUpload(file_url) : undefined;
+		await processAssistantMessage(thread_id, message, file_id);
 		const allMessages = await openai.beta.threads.messages.list(thread_id);
 		console.log("allMessages", JSON.stringify(allMessages, null, 2));
 

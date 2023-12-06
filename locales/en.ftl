@@ -15,3 +15,9 @@ reset_success=
 
 reset_error=
     An error occured while resetting your chat history. Please try again later.
+
+media_group_error=
+    Cannot send more than one document at a time.
+
+caption_error=
+    Must specify what to do with document.

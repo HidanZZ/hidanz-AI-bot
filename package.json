@@ -15,9 +15,11 @@
     "typescript": "^5.3.2"
   },
   "dependencies": {
+    "@grammyjs/files": "^1.0.4",
     "@grammyjs/i18n": "^1.0.1",
     "@grammyjs/stateless-question": "^3.0.1",
     "@grammyjs/storage-file": "^2.4.1",
+    "axios": "^1.6.2",
     "dotenv": "^16.3.1",
     "grammy": "^1.19.2",
     "grammy-inline-menu": "^8.0.1",
