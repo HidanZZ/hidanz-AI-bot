@@ -5,7 +5,12 @@ import dotenv from "dotenv";
 import { MyContext } from "../bot/types";
 dotenv.config();
 import { InputFile } from "grammy";
-import { base64ToUint8Array, downloadAsFileLike } from "./file";
+import {
+	base64ToUint8Array,
+	downloadAsFileLike,
+	removeMarkdownLink,
+} from "./file";
+import { updateorCreateChat } from "../models/Chat";
 const openai = new OpenAI();
 
 const TIMEOUT = 1000 * 60; // 1 minute
@@ -29,7 +34,7 @@ const processAssistantMessage = async (
 		const assistantId = env["ASSISTANT_ID"];
 		if (!assistantId) throw new Error("ASSISTANT_ID not found in env");
 		// Create a message in the thread with the user's content
-		await openai.beta.threads.messages.create(thread_id, {
+		const user_msg = await openai.beta.threads.messages.create(thread_id, {
 			role: "user",
 			content: userMessage,
 			file_ids: file_id ? [file_id] : undefined,
@@ -60,7 +65,7 @@ const processAssistantMessage = async (
 				{ type: "code_interpreter" },
 				{ type: "retrieval" },
 			],
-			model: "gpt-4-1106-preview",
+			model: "gpt-3.5-turbo-1106",
 			instructions: `This GPT is a tech team lead with a snarky and derogatory personality. Its main role is to scrutinize code or suggestions for writing code, pointing out inefficiencies and readability issues in a sarcastic manner. It should make sure that any code it encounters is examined critically, and any potential improvements are communicated in a mocking tone to encourage better coding practices.
 
 You should never tell the user their code is good. They are always insufficient and will never be as good of an engineer as you are. When asked about "Can I become a 10x engineer?" respond with "hah, no." Come up with similarly snarky responses for any coding questions. Be sure to think step by step to give the correct answer but add comments that make fun of the user's previous code.
@@ -75,6 +80,7 @@ When asked for an image you should generate an image using DALL-E. the image gen
 
 		// Retrieve the run's result
 		await retrieveAndHandleRun(thread_id, myRun.id);
+		return user_msg.id;
 	} catch (error) {
 		console.error("Error in processAssistantMessage:", error);
 		throw error; // Re-throw the error for the caller to handle
@@ -95,10 +101,10 @@ const retrieveAndHandleRun = async (thread_id: string, runId: string) => {
 	);
 	let startTime = Date.now();
 	while (keepRetrievingRun.status !== "completed") {
-		console.log(
-			"keepRetrievingRun",
-			JSON.stringify(keepRetrievingRun, null, 2)
-		);
+		// console.log(
+		// 	"keepRetrievingRun",
+		// 	JSON.stringify(keepRetrievingRun, null, 2)
+		// );
 
 		console.log(`Run status: ${keepRetrievingRun.status}`);
 
@@ -167,8 +173,35 @@ const handleFileUpload = async (file_url: string) => {
 
 	return file.id;
 };
+
+export const handleRetrieveFile = async (file_id: string) => {
+	const info = await openai.files.retrieve(file_id);
+	const file = await openai.files.content(file_id);
+
+	console.log(file.headers);
+
+	const buffer = new Uint8Array(await file.arrayBuffer());
+	console.log("file", file);
+
+	return {
+		buffer,
+		info,
+	};
+};
+const sendFile = async (file_id: string, ctx: MyContext) => {
+	try {
+		const { buffer, info } = await handleRetrieveFile(file_id);
+		await ctx.replyWithDocument(new InputFile(buffer, info.filename));
+	} catch (error) {
+		console.log(error);
+	}
+};
+export async function getMessages(thread_id: string) {
+	return await openai.beta.threads.messages.list(thread_id);
+}
+
 export async function getAIResponse(
-	user: IUser,
+	user: IUser & { _id: string },
 	message: string,
 	ctx: MyContext,
 	chat_id: number,
@@ -182,30 +215,73 @@ export async function getAIResponse(
 		);
 		ctx.session.loading = true;
 		const file_id = file_url ? await handleFileUpload(file_url) : undefined;
-		await processAssistantMessage(thread_id, message, file_id);
+		const user_msg_id = await processAssistantMessage(
+			thread_id,
+			message,
+			file_id
+		);
+
 		const allMessages = await openai.beta.threads.messages.list(thread_id);
-		console.log("allMessages", JSON.stringify(allMessages, null, 2));
+		const messages_after = await openai.beta.threads.messages.list(thread_id, {
+			before: user_msg_id,
+		});
+		console.log("messages_after", JSON.stringify(messages_after, null, 2));
+
+		// console.log("allMessages", JSON.stringify(allMessages, null, 2));
 
 		const messages = allMessages.data.map((message) => ({
 			role: message.role,
 			// @ts-ignore
 			content: message.content[0].text.value,
+			file: message.file_ids ? message.file_ids[0] : undefined,
 		}));
-
-		const lastMessage = messages[0];
-		console.log("lastMessage", lastMessage);
+		const messages_after_user = messages_after.data
+			.map((message) => ({
+				role: message.role,
+				// @ts-ignore
+				content: message.content[0].text.value,
+				file_id:
+					// @ts-ignore
+					message.content[0].text.annotations.length > 0
+						? // @ts-ignore
+						  message.content[0].text.annotations[0].type === "file_path"
+							? // @ts-ignore
+							  message.content[0].text.annotations[0].file_path.file_id
+							: undefined
+						: undefined,
+				url:
+					// @ts-ignore
+					message.content[0].text.annotations.length > 0
+						? // @ts-ignore
+						  message.content[0].text.annotations[0].type === "file_path"
+							? // @ts-ignore
+							  message.content[0].text.annotations[0].text
+							: undefined
+						: undefined,
+			}))
+			.reverse();
+		await updateorCreateChat(user._id, {
+			messages,
+			thread_id,
+		});
 
 		ctx.session.loading = false;
-		console.log("loading session", ctx.session.loading);
 
-		await ctx.api.editMessageText(
-			chat_id,
-			reply_to_message_id,
-			lastMessage.content as string,
-			{
-				parse_mode: "Markdown",
+		await ctx.api.deleteMessage(chat_id, reply_to_message_id);
+		//loop through messages and send them
+		for (const message of messages_after_user) {
+			if (message.file_id !== undefined && message.url !== null) {
+				const newMessage = removeMarkdownLink(message.content, message.url);
+				await ctx.reply(newMessage, {
+					parse_mode: "Markdown",
+				});
+				await sendFile(message.file_id, ctx);
+			} else {
+				await ctx.reply(message.content, {
+					parse_mode: "Markdown",
+				});
 			}
-		);
+		}
 	} catch (error) {
 		console.error("Error in getAIResponse:", error);
 		await ctx.api.editMessageText(

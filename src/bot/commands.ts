@@ -1,7 +1,14 @@
 import { Composer } from "grammy";
 import { MyContext } from "./types";
 import { resetThread } from "../models/User";
-import { getAIResponse, getImageGeneration } from "../utils/ai";
+import {
+	getAIResponse,
+	getImageGeneration,
+	getMessages,
+	handleRetrieveFile,
+} from "../utils/ai";
+import { endChat } from "../models/Chat";
+import { InputFile } from "grammy";
 
 export const bot = new Composer<MyContext>();
 
@@ -10,6 +17,8 @@ bot.command("reset", async (ctx) => {
 		const user = ctx.session.dbuser;
 		if (!user) return;
 		await resetThread(user.id);
+		//@ts-ignore
+		await endChat(user._id);
 		await ctx.reply(ctx.t("reset_success"));
 	} catch (error) {
 		console.log(error);
@@ -26,6 +35,24 @@ bot.command("image", async (ctx) => {
 	getImageGeneration(message, ctx, ctx.chat.id, reply_msg.message_id);
 });
 
+bot.command("test", async (ctx) => {
+	const user = ctx.session.dbuser;
+	if (!user) return;
+	const thread_id = user.current_thread;
+	if (!thread_id) return;
+	const msgs = await getMessages(thread_id);
+	console.log(JSON.stringify(msgs, null, 2));
+});
+bot.command("end", async (ctx) => {
+	try {
+		const { buffer, info } = await handleRetrieveFile(
+			"file-C7xPXyAuBQKiJiFQfdfFSbDE"
+		);
+		await ctx.replyWithDocument(new InputFile(buffer, info.filename));
+	} catch (error) {
+		console.log(error);
+	}
+});
 bot.on("message", async (ctx) => {
 	console.log("loading", ctx.session.loading);
 

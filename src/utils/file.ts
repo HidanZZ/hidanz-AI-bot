@@ -25,3 +25,18 @@ export async function downloadAsFileLike(url: string): Promise<FileLike> {
 	const file = new File([blob], "file");
 	return file;
 }
+
+export function removeMarkdownLink(str: string, url: string) {
+	// Construct the regex pattern to find the entire markdown link
+	// The pattern will be a non-greedy match of any characters in square brackets,
+	// followed by the exact URL in parentheses
+	const regexPattern = new RegExp(
+		`\\[.*?\\]\\(${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)`,
+		"g"
+	);
+
+	// Remove the markdown link from the string
+	const result = str.replace(regexPattern, "");
+
+	return result;
+}
