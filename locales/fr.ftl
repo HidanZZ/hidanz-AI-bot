@@ -3,12 +3,15 @@ help =
     
     - /start : Démarrer le bot
     - /help : Afficher ce message d'aide
-    - /reset : Réinitialiser votre historique de chat
-    - /image: Générer une image a partir d'un texte
+    - /reset : Réinitialiser l'historique de votre chat
+    - /image : Générer une image à partir de la commande /image <prompt>
+    - /settings : Modifier vos paramètres et changer d'agents
+
+    Vous pouvez simplement discuter avec le bot et il vous répondra.
     
     Si vous avez des questions ou besoin d'aide, n'hésitez pas à demander !
 
-    N'oubliez pas de consulter mon site web et mon github !
+    N'oubliez pas de consulter mon site web et mon GitHub !
 
 reset_success=
     Votre historique de chat a été réinitialisé !

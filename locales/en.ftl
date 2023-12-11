@@ -4,7 +4,10 @@ help =
     - /start: Start the bot
     - /help: Display this help message
     - /reset: Reset your chat history
-    - /image: Generate an image from prompt
+    - /image: Generate an image from prompt /image <prompt>
+    - /settings: Change your settings and change agents
+
+    you can just chat with the bot and it will resond to you.
     
     If you have any questions or need assistance, feel free to ask!
 

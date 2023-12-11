@@ -43,6 +43,8 @@ baseBot.api.config.use(hydrateFiles(baseBot.token));
 
 baseBot.use(attachUser);
 baseBot.use(configureI18n);
+baseBot.command(["start", "help"], startMessage);
+baseBot.use(menu);
 baseBot.use(commands);
 async function startMessage(ctx: MyContext) {
 	const name = ctx.from?.first_name ?? "User";
@@ -63,9 +65,7 @@ async function startMessage(ctx: MyContext) {
 		},
 	});
 }
-baseBot.command(["start", "help"], startMessage);
 
-baseBot.use(menu);
 export async function start(): Promise<void> {
 	// The commands you set here will be shown as /commands like /start or /magic in your telegram client.
 	await baseBot.api.setMyCommands([

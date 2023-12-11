@@ -1,6 +1,6 @@
 import { Composer } from "grammy";
 import { MyContext } from "./types";
-import { resetThread } from "../models/User";
+import { resetHistory, resetThread } from "../models/User";
 import {
 	getAIResponse,
 	getImageGeneration,
@@ -14,11 +14,7 @@ export const bot = new Composer<MyContext>();
 
 bot.command("reset", async (ctx) => {
 	try {
-		const user = ctx.session.dbuser;
-		if (!user) return;
-		await resetThread(user.id);
-		//@ts-ignore
-		await endChat(user._id);
+		await resetHistory(ctx);
 		await ctx.reply(ctx.t("reset_success"));
 	} catch (error) {
 		console.log(error);

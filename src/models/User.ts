@@ -1,10 +1,12 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Types } from "mongoose";
+import { MyContext } from "../bot/types";
+import { endChat } from "./Chat";
 
 export interface IUser {
 	id: number;
 	language: string;
 	current_thread?: string;
-	current_instruction?: string;
+	current_agent?: any;
 }
 
 const userSchema = new Schema<IUser>({
@@ -21,8 +23,10 @@ const userSchema = new Schema<IUser>({
 		type: String,
 		default: null,
 	},
-	current_instruction: {
-		type: String,
+	current_agent: {
+		type: Schema.Types.ObjectId,
+		ref: "Agent",
+		default: null,
 	},
 });
 
@@ -36,7 +40,7 @@ export function findOrCreateUser(id: number) {
 			upsert: true,
 			new: true,
 		}
-	);
+	).populate("current_agent");
 }
 export function changeLanguage(id: number, language: string) {
 	return User.findOneAndUpdate(
@@ -48,21 +52,24 @@ export function changeLanguage(id: number, language: string) {
 		}
 	);
 }
+export function getUserById(id: string | Types.ObjectId) {
+	return User.findById(id);
+}
 
 export async function updateUser(
 	id: number,
 	{
 		current_thread,
-		current_instruction,
+		current_agent,
 	}: {
 		current_thread?: string;
-		current_instruction?: string;
+		current_agent?: string;
 	}
 ) {
 	const user = await User.findOne({ id });
 	if (!user) return null;
 	if (current_thread) user.current_thread = current_thread;
-	if (current_instruction) user.current_instruction = current_instruction;
+	if (current_agent) user.current_agent = current_agent;
 	return user.save();
 }
 
@@ -70,6 +77,28 @@ export async function resetThread(id: number) {
 	return User.findOneAndUpdate(
 		{ id },
 		{ current_thread: null },
+		{
+			upsert: true,
+			new: true,
+		}
+	);
+}
+
+export async function resetHistory(ctx: MyContext) {
+	const user = ctx.session.dbuser;
+	if (!user) return;
+	await resetThread(user.id);
+	//@ts-ignore
+	await endChat(user._id);
+}
+
+export async function assignInstruction(
+	id: number,
+	instruction: Types.ObjectId | string
+) {
+	return User.findOneAndUpdate(
+		{ id },
+		{ current_agent: instruction },
 		{
 			upsert: true,
 			new: true,

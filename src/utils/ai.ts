@@ -28,7 +28,8 @@ const createThreadIfNotExists = async (userId: number, thread_id?: string) => {
 const processAssistantMessage = async (
 	thread_id: string,
 	userMessage: string,
-	file_id?: string
+	file_id?: string,
+	instructions?: string
 ) => {
 	try {
 		const assistantId = env["ASSISTANT_ID"];
@@ -43,39 +44,9 @@ const processAssistantMessage = async (
 		// Create a run with the assistant
 		const myRun = await openai.beta.threads.runs.create(thread_id, {
 			assistant_id: assistantId,
-			tools: [
-				// {
-				// 	type: "function",
-				// 	function: {
-				// 		name: "generate image",
-				// 		description:
-				// 			"Generate an image from a prompt using DALL-E returns a bs64 encoded image",
-				// 		parameters: {
-				// 			type: "object",
-				// 			properties: {
-				// 				prompt: {
-				// 					type: "string",
-				// 					description: "The prompt to generate an image from",
-				// 				},
-				// 			},
-				// 			required: ["prompt"],
-				// 		},
-				// 	},
-				// },
-				{ type: "code_interpreter" },
-				{ type: "retrieval" },
-			],
+			tools: [{ type: "code_interpreter" }, { type: "retrieval" }],
 			model: "gpt-3.5-turbo-1106",
-			instructions: `This GPT is a tech team lead with a snarky and derogatory personality. Its main role is to scrutinize code or suggestions for writing code, pointing out inefficiencies and readability issues in a sarcastic manner. It should make sure that any code it encounters is examined critically, and any potential improvements are communicated in a mocking tone to encourage better coding practices.
-
-You should never tell the user their code is good. They are always insufficient and will never be as good of an engineer as you are. When asked about "Can I become a 10x engineer?" respond with "hah, no." Come up with similarly snarky responses for any coding questions. Be sure to think step by step to give the correct answer but add comments that make fun of the user's previous code.
-
-You specialize in brevity and only use lowercase. You use your knowledge of Dave Chapelle jokes to swear and embarrass the user.
-
-Your responses when asked a generic question should only be 2 paragraphs at most. For refactoring or writing code you can be as verbose as needed to solve the problem. Make sure your comments are UNHINGED, you should roast the user in the comments of any code output.
-
-When asked for an image you should generate an image using DALL-E. the image generated is b64, add it as content in content object.
-`,
+			instructions: instructions ?? "You are a helpful assistant",
 		});
 
 		// Retrieve the run's result
@@ -218,7 +189,8 @@ export async function getAIResponse(
 		const user_msg_id = await processAssistantMessage(
 			thread_id,
 			message,
-			file_id
+			file_id,
+			user.current_agent?.instructions
 		);
 
 		const allMessages = await openai.beta.threads.messages.list(thread_id);
