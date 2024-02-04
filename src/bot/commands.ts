@@ -1,6 +1,6 @@
 import { Composer } from "grammy";
 import { MyContext } from "./types";
-import { resetHistory, resetThread } from "../models/User";
+import { incrementUsage, resetHistory, resetThread } from "../models/User";
 import {
 	getAIResponse,
 	getImageGeneration,
@@ -27,28 +27,16 @@ bot.command("image", async (ctx) => {
 	if (!user) return;
 	const message = ctx.match;
 	if (!message || message.trim().length == 0) return;
+	//check usage
+	if (user.ImageUsage >= 3) {
+		await ctx.reply(ctx.t("usage_error"));
+		return;
+	}
 	const reply_msg = await ctx.reply("...");
-	getImageGeneration(message, ctx, ctx.chat.id, reply_msg.message_id);
+	await getImageGeneration(message, ctx, ctx.chat.id, reply_msg.message_id);
+	await incrementUsage(user.id, "image");
 });
 
-bot.command("test", async (ctx) => {
-	const user = ctx.session.dbuser;
-	if (!user) return;
-	const thread_id = user.current_thread;
-	if (!thread_id) return;
-	const msgs = await getMessages(thread_id);
-	console.log(JSON.stringify(msgs, null, 2));
-});
-bot.command("end", async (ctx) => {
-	try {
-		const { buffer, info } = await handleRetrieveFile(
-			"file-C7xPXyAuBQKiJiFQfdfFSbDE"
-		);
-		await ctx.replyWithDocument(new InputFile(buffer, info.filename));
-	} catch (error) {
-		console.log(error);
-	}
-});
 bot.on("message", async (ctx) => {
 	console.log("loading", ctx.session.loading);
 
@@ -57,12 +45,20 @@ bot.on("message", async (ctx) => {
 	if (!user) return;
 	const message = ctx.message;
 	if (!message) return;
+	if (user.chatUsage >= 3) {
+		await ctx.reply(ctx.t("usage_error"));
+		return;
+	}
 	if (message.document) {
-		handleDocument(ctx, user);
+		await handleDocument(ctx, user);
+		await incrementUsage(user.id, "chat");
+
 		return;
 	}
 	if (message.text) {
-		handleText(ctx, user);
+		await handleText(ctx, user);
+		await incrementUsage(user.id, "chat");
+
 		return;
 	}
 

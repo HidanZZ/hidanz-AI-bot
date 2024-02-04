@@ -24,3 +24,6 @@ media_group_error=
 
 caption_error=
     Must specify what to do with document.
+
+usage_error=
+    You have exceeded the maximum usage for this bot.

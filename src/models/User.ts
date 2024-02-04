@@ -7,6 +7,8 @@ export interface IUser {
 	language: string;
 	current_thread?: string;
 	current_agent?: any;
+	chatUsage: number;
+	ImageUsage: number;
 }
 
 const userSchema = new Schema<IUser>({
@@ -27,6 +29,14 @@ const userSchema = new Schema<IUser>({
 		type: Schema.Types.ObjectId,
 		ref: "Agent",
 		default: null,
+	},
+	chatUsage: {
+		type: Number,
+		default: 0,
+	},
+	ImageUsage: {
+		type: Number,
+		default: 0,
 	},
 });
 
@@ -104,4 +114,13 @@ export async function assignInstruction(
 			new: true,
 		}
 	);
+}
+
+export async function incrementUsage(id: number, type: "chat" | "image") {
+	const user = await User.findOne({ id });
+
+	if (!user) return null;
+	if (type === "chat") user.chatUsage++;
+	if (type === "image") user.ImageUsage++;
+	return user.save();
 }
